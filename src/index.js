@@ -6,41 +6,10 @@ import { Button, Container, Dimmer, Header, Input, Label, List, Loader, Segment 
 import MessageItem from './components/MessageItem'
 import hitApi from './services/api'
 
-// const TEMP_MESSAGES_DATA = {
-// 	data: [
-// 	  {
-// 	    id: 1,
-// 	    name: "chris",
-// 	    message: "hello world",
-// 	    created_at: "2021-06-25T16:28:02.402Z",
-// 	    updated_at: "2021-06-25T16:28:02.402Z"
-// 	  },
-// 	  {
-// 	    id: 2,
-// 	    name: "chris 2",
-// 	    message: "this is great",
-// 	    created_at: "2021-06-25T16:28:02.402Z",
-// 	    updated_at: "2021-06-25T16:28:02.402Z"
-// 	  },
-// 	  {
-// 	    id: 3,
-// 	    name: "sabaitis",
-// 	    message: "another message",
-// 	    created_at: "2021-06-25T16:28:02.402Z",
-// 	    updated_at: "2021-06-25T16:28:02.402Z"
-// 	  }
-// 	],
-// 	errors: null
-// }
-
 const ALPHA_ADVANTAGE_API_KEY = '6KQUP90TQJ4ZTYK3' // should be env var
 const ALPHA_ADVANTAGE_API = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&apikey=${ALPHA_ADVANTAGE_API_KEY}&symbol=`
 const MESSAGES_API_CREATE = 'https://rails-chat-forum-api.herokuapp.com/api/create_message'
 const MESSAGES_API_FETCH = 'https://rails-chat-forum-api.herokuapp.com/api/get_messages'
-
-const buildMessage = (id, name, message) => {
-	return (<MessageItem key={id} name={name} message={message}/>)
-}
 
 class ChatForum extends React.Component{
 	constructor() {
@@ -54,6 +23,7 @@ class ChatForum extends React.Component{
 		}
 	}
 
+	// update our state variables
 	updateName = (name) => {this.setState({userName: name})}
 	updateMessage = (message) => {this.setState({userMessage: message})}
 	updateMessages = (messages) => {this.setState({messages: messages.data.reverse()})}
@@ -64,9 +34,9 @@ class ChatForum extends React.Component{
 
 	handleInput = (e, inputName) => {
 		let value = e.target.value
-		if(inputName == 'name'){
+		if(inputName === 'name'){
 			this.updateName(value)
-		} else if(inputName == 'message'){
+		} else if(inputName === 'message'){
 			this.updateMessage(value)
 		}
 	}
@@ -78,6 +48,7 @@ class ChatForum extends React.Component{
 	}
 
 	componentDidUpdate = () => {
+		// only scroll after messages are pulled from the server
 		if(this.state.scroll){
 			this.scrollToBottom()
 			this.toggleScroll()
@@ -89,14 +60,16 @@ class ChatForum extends React.Component{
 		data.then(response => {this.updateMessages(response)})
 	}
 
-	fetchMessagesTimer() {
+	// recurring function to fetch messages every 2 secs
+	fetchMessagesTimer = () => {
 		setTimeout(() => {
 			this.fetchMessages()
 			this.fetchMessagesTimer()
 		}, 2000)
 	}
 
-	replaceTextWithQuote = (message, quote) => {
+	// alpha advantage (AA)-specific function to replace text with the quote data
+	replaceTextWithQuoteAlphaAdv = (message, quote) => {
 		let stock = quote['01. symbol']
 		let price = quote['05. price']
 		let newMessage = message.replaceAll(`$${stock}`,`$${price}`)
@@ -104,32 +77,32 @@ class ChatForum extends React.Component{
 	}
 
 	parseStocks = async (message) => {
-		let re = /(\$[A-Za-z]+)/g 
+		let re = /(\$[A-Za-z]+)/g // regex to get text with format '$xxx'
 		let stocks = message.match(re)
 		let urlBase = ALPHA_ADVANTAGE_API
-		let urls = []
 		let newMessage = message
 		
+		// return if message contains no stocks
 		if(!stocks){
 			return message
 		}
 
-		stocks.map(stock => {
+		// map each stock with it's price
+		let urls = stocks.map(stock => {
 			let uri = `${urlBase}${stock.slice(1)}`
 			let r = Promise.all([hitApi(uri)])
-			urls.push(r)
+			return r
 		})
 		return Promise.all(urls).then(data => {
 			data.map(quote => {
-				newMessage = this.replaceTextWithQuote(newMessage, quote[0]['Global Quote'])
+				newMessage = this.replaceTextWithQuoteAlphaAdv(newMessage, quote[0]['Global Quote'])
 			})
 			return newMessage
 		})
 	}
 
-
-	sendMessage() {
-		this.toggleSendingLoader()
+	sendMessage = () => {
+		this.toggleSendingLoader() // show loader
 		const {userName, userMessage} = this.state
 		if(userName && userMessage){
 			this.parseStocks(userMessage).then(parsedMessage => {
@@ -140,8 +113,8 @@ class ChatForum extends React.Component{
 				)
 				data.then(response => {
 					this.updateMessages(response)
-					this.toggleScroll()
-					this.toggleSendingLoader()
+					this.toggleScroll() // scroll to bottom
+					this.toggleSendingLoader() // hide loader
 					this.updateName('')
 					this.updateMessage('')
 				})
@@ -149,7 +122,12 @@ class ChatForum extends React.Component{
 		}
 	}
 
-	messagesSegment() {
+	// use the MessageItem component + any other decorators that might be necessary
+	buildMessage = (id, name, message) => {
+		return (<MessageItem key={id} name={name} message={message}/>)
+	}
+
+	messagesSegment = () => {
 		let messages = this.state.messages
 		let sendingLoader = this.state.sendingLoader
 		return(
@@ -164,7 +142,7 @@ class ChatForum extends React.Component{
 						{messages && messages.length > 0 && 
 							<List divided relaxed>
 								{messages.map(
-									(message) => buildMessage(message.id, message.name, message.message)
+									(message) => this.buildMessage(message.id, message.name, message.message)
 								)}
 							</List>
 						}
@@ -185,7 +163,7 @@ class ChatForum extends React.Component{
 		)
 	}
 
-	inputSegment(){
+	inputSegment = () =>{
 		return(
 			<div>
 				<Input
