@@ -1,10 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom';
 import 'semantic-ui-css/semantic.min.css'
-
 import { Button, Container, Dimmer, Header, Input, Label, List, Loader, Segment } from 'semantic-ui-react'
-import MessageItem from './components/MessageItem/'
-import './index.css';
+
+import MessageItem from './components/MessageItem'
+import hitApi from './services/api'
 
 // const TEMP_MESSAGES_DATA = {
 // 	data: [
@@ -33,26 +33,13 @@ import './index.css';
 // 	errors: null
 // }
 
-const ALPHA_ADVANTAGE_API_KEY = '6KQUP90TQJ4ZTYK3'
+const ALPHA_ADVANTAGE_API_KEY = '6KQUP90TQJ4ZTYK3' // should be env var
+const ALPHA_ADVANTAGE_API = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&apikey=${ALPHA_ADVANTAGE_API_KEY}&symbol=`
+const MESSAGES_API_CREATE = 'https://rails-chat-forum-api.herokuapp.com/api/create_message'
+const MESSAGES_API_FETCH = 'https://rails-chat-forum-api.herokuapp.com/api/get_messages'
 
 const buildMessage = (id, name, message) => {
 	return (<MessageItem key={id} name={name} message={message}/>)
-}
-
-const hitApi = async (url, body=null, method='GET') => {
-	let response = await fetch(url,{
-		method: method,
-		body: body,
-		headers: {
-			'Accept': 'application/json',
-			'Content-Type': 'application/json'
-		}
-	})
-	.then(res => res.json())
-	.then(data => {
-		return data
-	})
-	return response
 }
 
 class ChatForum extends React.Component{
@@ -98,7 +85,7 @@ class ChatForum extends React.Component{
 	}
 
 	fetchMessages = () => {
-		let data = hitApi('https://rails-chat-forum-api.herokuapp.com/api/get_messages')
+		let data = hitApi(MESSAGES_API_FETCH)
 		data.then(response => {this.updateMessages(response)})
 	}
 
@@ -112,7 +99,6 @@ class ChatForum extends React.Component{
 	replaceTextWithQuote = (message, quote) => {
 		let stock = quote['01. symbol']
 		let price = quote['05. price']
-		console.log(stock)
 		let newMessage = message.replaceAll(`$${stock}`,`$${price}`)
 		return newMessage
 	}
@@ -120,7 +106,7 @@ class ChatForum extends React.Component{
 	parseStocks = async (message) => {
 		let re = /(\$[A-Za-z]+)/g 
 		let stocks = message.match(re)
-		let urlBase = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&apikey=${ALPHA_ADVANTAGE_API_KEY}&symbol=`
+		let urlBase = ALPHA_ADVANTAGE_API
 		let urls = []
 		let newMessage = message
 		
@@ -148,7 +134,7 @@ class ChatForum extends React.Component{
 		if(userName && userMessage){
 			this.parseStocks(userMessage).then(parsedMessage => {
 				let data = hitApi(
-					'https://rails-chat-forum-api.herokuapp.com/api/create_message',
+					MESSAGES_API_CREATE,
 					JSON.stringify({name: userName, message: parsedMessage}),
 					'POST'
 				)
@@ -170,8 +156,8 @@ class ChatForum extends React.Component{
 			<Segment>
 				{sendingLoader && 
 					<Dimmer active inverted>
-		        <Loader>Loading</Loader>
-		      </Dimmer>
+				        <Loader>Loading</Loader>
+				    </Dimmer>
 				}
 				<div style={{height: "25em", overflowY: 'scroll'}}>
 					<Label.Group color='blue'>
@@ -185,8 +171,8 @@ class ChatForum extends React.Component{
 						{(!messages || (messages && messages.length === 0)) &&
 							<Header as='h2' style={{
 								display: 'flex',
-						    alignItems: 'center',
-						    justifyContent: 'center',
+							    alignItems: 'center',
+							    justifyContent: 'center'
 							}}>No messages yet!</Header>
 						}
 						<div 
